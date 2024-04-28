@@ -54,3 +54,48 @@ plt.title('Frequencia de Ingestão de Café')
 plt.tight_layout()  
 
 #%%
+mapping_trocadevalores = {
+    'NA': 0,
+    'TRUE': 1,
+    'True': 1,
+    'FALSE': 0,
+    'False': 0,
+}
+
+#%%
+#Pie chart mostrando onde pessoas tendem ao beber café
+
+#selecionando as colunas necessárias
+colunas_para_contagem_locais_de_beber_cafe = [
+    'Where_do_you_typically_drink_coffee_At_home',
+    'Where_do_you_typically_drink_coffee_At_the_office',
+    'Where_do_you_typically_drink_coffee_On_the_go',
+    'Where_do_you_typically_drink_coffee_At_a_cafe',
+    'Where do you typically drink coffee_None_of_these'
+]
+#montando numa própria tabela
+tabela_contagem_locais_de_beber_cafe = tab_cafe[colunas_para_contagem_locais_de_beber_cafe].copy()
+# Convertendo-a em dados binários
+tabela_contagem_locais_de_beber_cafe.replace(mapping_trocadevalores, inplace=True)
+# Obtendo dummies para as variáveis de local de consumo de café
+df_tabela_contagem_locais_de_beber_cafe = pd.DataFrame(tabela_contagem_locais_de_beber_cafe)
+frequencias_locais_de_beber_cafe = df_tabela_contagem_locais_de_beber_cafe.sum(axis=0)
+
+plt.bar(frequencias_locais_de_beber_cafe, frequencias_locais_de_beber_cafe)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
