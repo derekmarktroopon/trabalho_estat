@@ -14,8 +14,7 @@ import numpy as np
 import seaborn as sns
 from scipy.stats import chi2_contingency as chi2_cont
 from scipy.stats import chi2
-from scipy import stats
-import statsmodels.api as sm
+import scipy.cluster.hierarchy as sch
 
 #%%
 
@@ -335,23 +334,23 @@ tab_bin_idades_2 = tab_cafe['What_is_your_age']
 
 tab_bin_locais_de_beber_cafe_2 = tabela_contagem_locais_de_beber_cafe.astype(bool)
 
-# Calculate correlation and residuals for each column of the binary table
+# Calculo das corelações 
 result_locais_de_beber_cafe_2 = {}
 for column in tab_bin_locais_de_beber_cafe_2:
     observed = pd.crosstab(tab_bin_locais_de_beber_cafe_2[column], tab_bin_idades_2)
     chi2, p, dof, expected = chi2_cont(observed)
     result_locais_de_beber_cafe_2[column] = {'Chi-square': chi2, 'p-value': p}
 
-# Dictionary to store observed and expected frequencies
+# Vetor das frequências esperadas
 freqs = {}
 
-# Perform chi-square test of independence for each binary response variable
+# Teste Qui-quadrado
 for column in tab_bin_locais_de_beber_cafe_2:
     observed = pd.crosstab(tab_bin_locais_de_beber_cafe_2[column], tab_bin_idades_2)
     chi2, p, dof, expected = chi2_cont(observed)
     freqs[column] = {'Observed': observed, 'Expected': expected}
 
-# Calculate residuals and create residual matrices
+# Calcular os resíduos e criar matrizes residuais
 residual_matrices = {}
 for column, data in freqs.items():
     observed = data['Observed']
@@ -361,8 +360,8 @@ for column, data in freqs.items():
     residuals[~observed.astype(bool)] = np.nan
     residual_matrices[column] = residuals
 
-# Create combined heatmap of residuals
-plt.figure(figsize=(12, 6))  # Adjust the figure size as needed
+# Criar mapa de calor
+plt.figure(figsize=(35, 30))  
 for i, (column, residuals) in enumerate(residual_matrices.items(), 1):
     plt.subplot(1, len(residual_matrices), i)
     sns.heatmap(residuals, annot=True, cmap='coolwarm', cbar=False, square=True, fmt=".2f")  # Specify format
@@ -372,4 +371,276 @@ for i, (column, residuals) in enumerate(residual_matrices.items(), 1):
 plt.show()
 
 
+
+#%% 
+
+#relação: idade - quais tipos de café são preferidas
+
+tab_rel_idade_tipobeb_cafe = pd.crosstab(tab_cafe['What_is_your_age'], tab_cafe['What_is_your_favorite_coffee_drink'], margins = True)
+
+#Agora vou deletar os totais, pois vamos fazer isso manualmente depois
+tab_rel_idade_tipobeb_cafe.drop(['All'], axis = 1, inplace = True)
+tab_rel_idade_tipobeb_cafe.drop(['All'], axis = 0, inplace = True)
+
+# Fazendo o teste Qui2
+chi2_calculado_rel_idade_tipobeb_cafe, p, dof, expect = chi2_cont(tab_rel_idade_tipobeb_cafe)
+
+#Definindo a matriz
+n_tab_rel_idade_tipobeb_cafe = np.matrix(tab_rel_idade_tipobeb_cafe, dtype = float)
+
+#Contando
+cont_sum_row_tipobeb_cafe = n_tab_rel_idade_tipobeb_cafe.sum(axis=1)
+cont_sum_col_tipobeb_cafe = n_tab_rel_idade_tipobeb_cafe.sum(axis=0)
+
+#Criando a matriz de frequencia esperada
+freq_abs_esperada_tipobeb_cafe = (np.multiply(cont_sum_row_tipobeb_cafe,
+                                 cont_sum_col_tipobeb_cafe))/n_tab_rel_idade_tipobeb_cafe.sum()
+
+#Obtendo a matriz residual
+residuo_n_tab_rel_idade_tipobeb_cafe = n_tab_rel_idade_tipobeb_cafe - freq_abs_esperada_tipobeb_cafe
+
+#Agora vamos fazer o calculo do chi2
+chi2_tipobeb_cafe = np.divide(np.square(residuo_n_tab_rel_idade_tipobeb_cafe), freq_abs_esperada_tipobeb_cafe).sum()
+
+#Calculando a matriz dos residuos padronizados
+residuo_padronizado_tab_rel_idade_tipobeb_cafe = residuo_n_tab_rel_idade_tipobeb_cafe / np.sqrt(freq_abs_esperada_tipobeb_cafe)
+
+#Calculando a matriz dos residuos padronizados ajustados
+residuo_padronizado_ajust_tab_rel_idade_tipobeb_cafe = np.divide(residuo_padronizado_tab_rel_idade_tipobeb_cafe,
+                       np.sqrt(np.multiply(
+                           (1-(cont_sum_col/n_tab_rel_idade_tipobeb_cafe.sum())),
+                           (1-(cont_sum_row/n_tab_rel_idade_tipobeb_cafe.sum())))))
+
+#Fazendo uma figura bonitinha para mostrar eses residuos
+colunas = ['Americano', 'Bebida mista', 'Cappuccino', 'Cold Brew', 'Cortado', 'Espresso', 'Café gelado', 'Latte', 'Mocha', 'NA' , 'Outro', 'Pourover (Coado)', 'Café de Filtro' ]
+linhas = ['18-24 anos', '25-34 anos', '35-44 anos', '45-54 anos', '55-64 anos', '<18 anos', '>65 anos', 'NA']
+ax = sns.heatmap(residuo_padronizado_ajust_tab_rel_idade_tipobeb_cafe, annot=True, xticklabels=colunas, yticklabels=linhas)
+
+#%%
+
+#relação: idade - As durezas de café prefirídas
+
+tab_rel_idade_forca_cafe = pd.crosstab(tab_cafe['What_is_your_age'], tab_cafe['How_strong_do_you_like_your_coffee'], margins = True)
+
+#Agora vou deletar os totais, pois vamos fazer isso manualmente depois
+tab_rel_idade_forca_cafe.drop(['All'], axis = 1, inplace = True)
+tab_rel_idade_forca_cafe.drop(['All'], axis = 0, inplace = True)
+
+# Fazendo o teste Qui2
+chi2_calculado_rel_idade_tipobeb_cafe, p, dof, expect = chi2_cont(tab_rel_idade_tipobeb_cafe)
+chi2_tabelado_rel_idade_tipobeb_cafe = chi2.ppf(0.95, 4) # temos que considera 4 graus de liberdade
+
+#Agora, fazendo o passo a passo para determinar a relação entre as categorias
+
+#Definindo a matriz
+n_tab_rel_idade_tipobeb_cafe = np.matrix(tab_rel_idade_tipobeb_cafe, dtype = float)
+
+#Contando
+cont_sum_row = n_tab_rel_idade_tipobeb_cafe.sum(axis=1)
+cont_sum_col = n_tab_rel_idade_tipobeb_cafe.sum(axis=0)
+
+#Criando a matriz de frequencia esperada
+freq_abs_esperada = (np.multiply(cont_sum_row,
+                                 cont_sum_col))/n_tab_rel_idade_tipobeb_cafe.sum()
+
+#Obtendo a matriz residual
+residuo_n_tab_rel_idade_tipobeb_cafe = n_tab_rel_idade_tipobeb_cafe - freq_abs_esperada
+
+#Agora vamos fazer o calculo do chi2
+chi2 = np.divide(np.square(residuo_n_tab_rel_idade_tipobeb_cafe), freq_abs_esperada).sum()
+
+#Calculando a matriz dos residuos padronizados
+residuo_padronizado_tab_rel_idade_tipobeb_cafe = residuo_n_tab_rel_idade_tipobeb_cafe  / np.sqrt(freq_abs_esperada)
+
+#Calculando a matriz dos residuos padronizados ajustados
+residuo_padronizado_ajust_tab_rel_idade_tipobeb_cafe  = np.divide(residuo_padronizado_tab_rel_idade_tipobeb_cafe ,
+                       np.sqrt(np.multiply(
+                           (1-(cont_sum_col/n_tab_rel_idade_tipobeb_cafe .sum())),
+                           (1-(cont_sum_row/n_tab_rel_idade_tipobeb_cafe .sum())))))
+
+#Fazendo uma figura bonitinha para mostrar eses residuos
+colunas = ['Americano', 'Bebida mista', 'Cappuccino', 'Cold Brew', 'Cortado', 'Espresso', 'Café gelado', 'Latte', 'Mocha', 'NA' , 'Outro', 'Pourover (Coado)', 'Café de Filtro' ]
+linhas = ['18-24 anos', '25-34 anos', '35-44 anos', '45-54 anos', '55-64 anos', '<18 anos', '>65 anos', 'NA']
+ax = sns.heatmap(residuo_padronizado_ajust_tab_rel_idade_tipobeb_cafe, annot=True, xticklabels=colunas, yticklabels=linhas)
+
+
+#relação: idade - dureza de café
+
+tab_rel_idade_durez_caf = pd.crosstab(tab_cafe['What_is_your_age'], tab_cafe['How_strong_do_you_like_your_coffee'], margins = True)
+
+#Agora vou deletar os totais, pois vamos fazer isso manualmente depois
+tab_rel_idade_durez_caf.drop(['All'], axis = 1, inplace = True)
+tab_rel_idade_durez_caf.drop(['All'], axis = 0, inplace = True)
+
+# Fazendo o teste Qui2
+chi2_calculado_rel_idade_durez_caf, p, dof, expect = chi2_cont(tab_rel_idade_durez_caf)
+
+#Agora, fazendo o passo a passo para determinar a relação entre as categorias
+
+#Definindo a matriz
+n_tab_rel_idade_durez_caf = np.matrix(tab_rel_idade_durez_caf, dtype = float)
+
+#Contando
+cont_sum_row = n_tab_rel_idade_durez_caf.sum(axis=1)
+cont_sum_col = n_tab_rel_idade_durez_caf.sum(axis=0)
+
+#Criando a matriz de frequencia esperada
+freq_abs_esperada_durez_caf = (np.multiply(cont_sum_row,
+                                 cont_sum_col))/n_tab_rel_idade_durez_caf.sum()
+
+#Obtendo a matriz residual
+residuo_n_tab_rel_idade_durez_caf = n_tab_rel_idade_durez_caf - freq_abs_esperada_durez_caf
+
+#Agora vamos fazer o calculo do chi2
+chi2 = np.divide(np.square(residuo_n_tab_rel_idade_durez_caf), freq_abs_esperada_durez_caf).sum()
+
+#Calculando a matriz dos residuos padronizados
+residuo_padronizado_tab_rel_idade_durez_caf = residuo_n_tab_rel_idade_durez_caf / np.sqrt(freq_abs_esperada_durez_caf)
+
+#Calculando a matriz dos residuos padronizados ajustados
+residuo_padronizado_ajust_tab_rel_idade_durez_caf = np.divide(residuo_padronizado_tab_rel_idade_durez_caf,
+                       np.sqrt(np.multiply(
+                           (1-(cont_sum_col/n_tab_rel_idade_durez_caf.sum())),
+                           (1-(cont_sum_row/n_tab_rel_idade_durez_caf.sum())))))
+
+#Fazendo uma figura bonitinha para mostrar eses residuos
+colunas = ['Médio', 'NA', 'Relativamente Leve', 'Relativamente Forte', 'Muito Forte', 'Fraca']
+linhas = ['18-24 anos', '25-34 anos', '35-44 anos', '45-54 anos', '55-64 anos', '<18 anos', '>65 anos', 'NA']
+ax = sns.heatmap(residuo_padronizado_ajust_tab_rel_idade_durez_caf, annot=True, xticklabels=colunas, yticklabels=linhas)
+
+#%%
+
+#relação: educação - quais tipos de café são preferidas
+
+
+tab_rel_edu_tipobeb_cafe = pd.crosstab(tab_cafe['Education_Level'], tab_cafe['What_is_your_favorite_coffee_drink'], margins = True)
+
+#Agora vou deletar os totais, pois vamos fazer isso manualmente depois
+tab_rel_edu_tipobeb_cafe.drop(['All'], axis = 1, inplace = True)
+tab_rel_edu_tipobeb_cafe.drop(['All'], axis = 0, inplace = True)
+
+# Fazendo o teste Qui2
+chi2_calculado_rel_edu_tipobeb_cafe, p, dof, expect = chi2_cont(tab_rel_edu_tipobeb_cafe)
+
+#Agora, fazendo o passo a passo para determinar a relação entre as categorias
+
+#Definindo a matriz
+n_tab_rel_edu_tipobeb_cafe = np.matrix(tab_rel_edu_tipobeb_cafe, dtype = float)
+
+#Contando
+cont_sum_row = n_tab_rel_edu_tipobeb_cafe.sum(axis=1)
+cont_sum_col = n_tab_rel_edu_tipobeb_cafe.sum(axis=0)
+
+#Criando a matriz de frequencia esperada
+freq_abs_esperada_durez_caf = (np.multiply(cont_sum_row,
+                                 cont_sum_col))/n_tab_rel_edu_tipobeb_cafe.sum()
+
+#Obtendo a matriz residual
+residuo_n_tab_rel_edu_tipobeb_cafe = n_tab_rel_edu_tipobeb_cafe - freq_abs_esperada_durez_caf
+
+#Agora vamos fazer o calculo do chi2
+chi2 = np.divide(np.square(residuo_n_tab_rel_edu_tipobeb_cafe), freq_abs_esperada_durez_caf).sum()
+
+#Calculando a matriz dos residuos padronizados
+residuo_padronizado_tab_rel_edu_tipobeb_cafe = residuo_n_tab_rel_edu_tipobeb_cafe / np.sqrt(freq_abs_esperada_durez_caf)
+
+#Calculando a matriz dos residuos padronizados ajustados
+residuo_padronizado_ajust_tab_rel_edu_tipobeb_cafe = np.divide(residuo_padronizado_tab_rel_edu_tipobeb_cafe,
+                       np.sqrt(np.multiply(
+                           (1-(cont_sum_col/n_tab_rel_edu_tipobeb_cafe.sum())),
+                           (1-(cont_sum_row/n_tab_rel_edu_tipobeb_cafe.sum())))))
+
+#Fazendo uma figura bonitinha para mostrar eses residuos
+colunas = ['Americano', 'Bebida mista', 'Cappuccino', 'Cold Brew', 'Cortado', 'Espresso', 'Café gelado', 'Latte', 'Mocha', 'NA' , 'Outro', 'Pourover (Coado)', 'Café de Filtro' ]
+linhas = ['Bacharelado', 'Doturado', 'Ensino Médio Completo', 'Até Ensino Médio Incompleto', 'Mestrado','NA' , 'Associates Degree']
+ax = sns.heatmap(residuo_padronizado_ajust_tab_rel_edu_tipobeb_cafe, annot=True, xticklabels=colunas, yticklabels=linhas)
+
+#%%
+
+#relação: educação - dureza de café
+
+tab_rel_edu_durez_caf = pd.crosstab(tab_cafe['Education_Level'], tab_cafe['How_strong_do_you_like_your_coffee'], margins = True)
+
+#Agora vou deletar os totais, pois vamos fazer isso manualmente depois
+tab_rel_edu_durez_caf.drop(['All'], axis = 1, inplace = True)
+tab_rel_edu_durez_caf.drop(['All'], axis = 0, inplace = True)
+
+# Fazendo o teste Qui2
+chi2_calculado_rel_edu_durez_caf, p, dof, expect = chi2_cont(tab_rel_edu_durez_caf)
+
+#Agora, fazendo o passo a passo para determinar a relação entre as categorias
+
+#Definindo a matriz
+n_tab_rel_edu_durez_caf = np.matrix(tab_rel_edu_durez_caf, dtype = float)
+
+#Contando
+cont_sum_row = n_tab_rel_edu_durez_caf.sum(axis=1)
+cont_sum_col = n_tab_rel_edu_durez_caf.sum(axis=0)
+
+#Criando a matriz de frequencia esperada
+freq_abs_esperada_durez_caf = (np.multiply(cont_sum_row,
+                                 cont_sum_col))/n_tab_rel_edu_durez_caf.sum()
+
+#Obtendo a matriz residual
+residuo_n_tab_rel_edu_durez_caf = n_tab_rel_edu_durez_caf - freq_abs_esperada_durez_caf
+
+#Agora vamos fazer o calculo do chi2
+chi2 = np.divide(np.square(residuo_n_tab_rel_edu_durez_caf), freq_abs_esperada_durez_caf).sum()
+
+#Calculando a matriz dos residuos padronizados
+residuo_padronizado_tab_rel_edu_durez_caf = residuo_n_tab_rel_edu_durez_caf / np.sqrt(freq_abs_esperada_durez_caf)
+
+#Calculando a matriz dos residuos padronizados ajustados
+residuo_padronizado_ajust_tab_rel_edu_durez_caf = np.divide(residuo_padronizado_tab_rel_edu_durez_caf,
+                       np.sqrt(np.multiply(
+                           (1-(cont_sum_col/n_tab_rel_edu_durez_caf.sum())),
+                           (1-(cont_sum_row/n_tab_rel_edu_durez_caf.sum())))))
+
+#Fazendo uma figura bonitinha para mostrar eses residuos
+colunas = ['Médio', 'NA', 'Relativamente Leve', 'Relativamente Forte', 'Muito Forte', 'Fraca']
+linhas = ['Bacharelado', 'Doturado', 'Ensino Médio Completo', 'Até Ensino Médio Incompleto', 'Mestrado','NA' , 'Associates Degree']
+ax = sns.heatmap(residuo_padronizado_ajust_tab_rel_edu_durez_caf, annot=True, xticklabels=colunas, yticklabels=linhas)
+
+#%%
+
+#Calcula das distâncias entre as preferências cafeterias entre pessoas de educação diferente
+
+#combinando as tabelas dos aspetos diferentes de café usado para esse calculo (sabor e intensidade)
+
+tabela_edu_caf_comb = pd.merge(tab_rel_edu_durez_caf, tab_rel_edu_tipobeb_cafe, on='Education_Level', how='outer')
+#tirada de qualquer valor não-numerico restante
+tabela_edu_caf_comb_semnome = tabela_edu_caf_comb.select_dtypes(include='number')
+
+Education_Level_list = ['Bacharelado', 'Doturado', 'Ensino Médio Completo', 'Até Ensino Médio Incompleto', 'Mestrado','NA' , 'Associates Degree']
+
+plt.figure(figsize=(10, 5)) 
+dendrograma_edu_caf_comb = sch.dendrogram(sch.linkage(tabela_edu_caf_comb_semnome, method = 'single', metric = 'euclidean'), labels = Education_Level_list)
+plt.title('Relação das Preferências de acordo com Nível de Educação', fontsize=20
+          )
+plt.xlabel('Nível de Escolaridade', fontsize=16)
+plt.xticks(rotation=45)
+plt.ylabel('Dist Euclidiana', fontsize=16)
 plt.show()
+
+#%%
+
+#Calcula das distâncias entre as preferências cafeterias entre pessoas de idade diferente
+
+#combinando as tabelas dos aspetos diferentes de café usado para esse calculo (sabor e intensidade)
+
+tabela_edu_caf_comb = pd.merge(tab_rel_idade_durez_caf, tab_rel_idade_tipobeb_cafe, on='What_is_your_age', how='outer')
+#tirada de qualquer valor não-numerico restante
+tabela_edu_caf_comb_semnome = tabela_edu_caf_comb.select_dtypes(include='number')
+
+age_list = ['18-24 anos', '25-34 anos', '35-44 anos', '45-54 anos', '55-64 anos', '<18 anos', '>65 anos', 'NA']
+
+plt.figure(figsize=(10, 5)) 
+dendrograma_edu_caf_comb = sch.dendrogram(sch.linkage(tabela_edu_caf_comb_semnome, method = 'single', metric = 'euclidean'), labels = age_list)
+plt.title('Relação das Preferências de acordo com Idades diferentes', fontsize=20
+          )
+plt.xlabel('Faixas de Idade', fontsize=16)
+plt.xticks(rotation=45)
+plt.ylabel('Dist Euclidiana', fontsize=16)
+plt.show()
+
+
